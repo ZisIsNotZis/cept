@@ -78,7 +78,7 @@ Combining all these desires, my language have following grammar (compared to C++
 
 * **Arbitrary precision**: Mylang internally supports arbitrary precision (since it's math-y). For technical details, high precision support can be "in compiler", or "hidden header". Mylang generally specifies number range rather than machine type, so arbitrary precision would be used if the compiler feels like it. Some compiler flag will be available to be able to tell the compiler how fast do you want the program to be. 
 
-	* **Function**: Syntax for defining function is
+* **Function**: Syntax for defining function is
 ```
 returnType arg1Type arg2Type;funcName = arg1Name arg2Name
 	...yourTABBEDcode...
