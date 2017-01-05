@@ -76,6 +76,7 @@ struct parse{
 					for(size_t i=2;i<list.size()-1;++i)s<<",auto "<<list[i].explaiN();
 					s<<')';
 				}
+				afterFunc=true;
 			}else{
 				s<<list[0].explaiN()<<'(';
 				if(s.size()>1){
