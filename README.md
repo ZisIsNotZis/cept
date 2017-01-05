@@ -80,30 +80,35 @@ Combining all these desires, my language have following grammar (compared to C++
 
 * **Function**: Syntax for defining function is
 ```
-returnType arg1Type arg2Type;funcName = arg1Name arg2Name
+returnType arg1Type arg2Type;funcName =
+	arg1Name arg2Name
 	...yourTABBEDcode...
 	funcName=...   // this is return 
 ```
 like auto/inline declare above, types do not have to be written. Function will be overloaded if required. The type (without name) here is `returnType arg1Type arg2Type`. If some function takes a function as argument and want to write out the argument types, do it like
 ```
-vec int  vec int  [bool int int]; qsort = a f
+vec int  vec int  [bool int int]; qsort =
+	a f
 	...
 ```
 The quick sort takes vector `vec int` and function `bool int int`, returns vector `vec int`.  Note `vec` is a function which takes at least a type (a `auto`) and returns a vector container that holds the type. Since it must be given one argument, there won't be ambiguity and it will pass compile. But there's no need to write out the types.
 ```
-qsort = a f
-   ...myCode...
-   qsort ... ...
-   qsort ... ...
+qsort =
+	a f
+	...myCode...
+	qsort ... ...
+	qsort ... ...
 ```
 Makes everybody's life easier. Function returning non-void will hold a variable with the same name as the function name. To return something, just write your return value on that name. It's a stack space so you can store temporary things with that if you want. If you don't write anything, the compiler will deduct the `auto` to `void` which means return nothing. Functions can be defined in-function. To write a lambda, use square brackets as we always use square brackets to solve syntax problem:
 ```
-qsort dat [ f = a b
-   f = a > b ] maybeAThirdArgument
+qsort dat [ f =
+	a b
+	f = a > b ] maybeAThirdArgument
 ```
 Do NOT write like this:
 ```
-qsort dat f = a b
+qsort dat f =
+	a b
 	f = a > b
 maybeAThirdArgument
 ```
@@ -128,7 +133,8 @@ Note I didn't omit anything here. Even if you just want to write the function pr
 	time;lastMessage
 	vec string;messages
 	int;orderInView
-	pushMessage = _
+	pushMessage =
+		_
 	popMessage =
 ];myClass myClassInstance
 ...thingsAbove...

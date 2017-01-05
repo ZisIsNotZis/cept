@@ -8,45 +8,43 @@ struct deF{
 	string var;
 };
 vector<deF> def;
+bool afterFunc=false;
 struct parse{
 	parse(){}
-	parse(string s){
+	parse(string s,size_t* retPos=0){
 		size_t l,r=0;
+		char staT=0;
+		stat=1;
 		while(r<s.size()){
 			for(;s[r]==' '||s[r]=='\t';++r);
 			l=r;
 			switch(s[r]){
-			case '[':
-				size_t bra=1;
-				for(;bra>0&&r<s.size();++r)
-					switch(s[r]){
-					case '[':++bra;break;
-					case']':--bra;break;
-					case'\'':for(++r;s[r]!='\''&&r<s.size();++r)if(s[r]=='\\')++r;
-					}
-				list.emplace_back(s.substr(l+1,r-l-1),err);
-				break;
-			case '\'':
-				bool str=false;
-				if(s[++r]=='\''||(s[r]=='\\'&&s[r+2]!='\'')||(s[r]!='\\'&&s[r+1]!='\''))str=true;
-				for(;s[r]!='\''&&r.size();++r)if(s[r]=='\\')++r;
-				prase content;
-				content.lead=str?'"'+s.substr(l+1,r-l-1)+'"':s.substr(l,r-l+1);
-				list.push_back(content);				
-				break;
+			case '[':list.emplace_back(s.substr(l+1,SIZE_MAX),&r);break;
+			case ']':if(retPos)*retPos=r+1;break;
 			case ';':
-				if(list.size()<1)throw EnoTypeBeforeVar;
-				for(;s[r]!=' '&&s[r]!='\t'&&r<s.size();++r);
-				def.emplace_back(list[list.size()-1],s.substr(l+1,r-l-1));
-				list.resize(list.size()-1);
-			default:
-				for(;s[r]!=' '&&s[r]!='\t'&&s[r]!=';'&&r<s.size();++r);
-				parse content;
-				content.lead=s.substr(l,r-1);
-				if(content.lead=="enum"){
-					//TODO
+				if(list.size()<1)throw DefNoType;
+				staT=2;
+				++r;
+				goto default;
+			case '\'':
+				if(s[++r]=='\'')
+					staT=1;
+				else{
+					if(s[r]=='\\')++r;
+					if(s[++r]!='\'')staT=1;
 				}
-				list.push_back(content);
+				r=l;
+				if(staT)s[r]='"';
+			default:
+				for(;s[r]!=' '&&s[r]!='\t'&&s[r]!=';'&&s[r]!=']'&&r<s.size();++r)if(s[r]=='\\')++r;
+				switch(staT){
+				case 1:s[r-1]='"';break;
+				case 2:def.emplace_back(list[list.size()-1],s.substr(l,r-l));continue;
+				}
+				parse tmp;
+				tmp.atom=s.substr(l,r-l);
+				tmp.stat=0;
+				list.push_back(tmp);
 			}
 		}
 	}
@@ -55,8 +53,8 @@ struct parse{
 		for(size_t i=0;i<def.size();++i){
 			string S=def[i].type.explaiN();
 			size_t j;
-			for(j=1;j<S.size()&&S[j]!='(';++j);
-			if(S[j]=='(')s<<S.substr(0,j)<<' '<<def[i].var<<S.substr(j,S.size()-j);
+			for(j=1;j<S.size()&&s[j]!='(';++j);
+			if(S[j]=='(')s<<S.substr(0,j)<<' '<<def[i].var<<S.substr(j,SIZE_MAX);
 			else s<<S<<' '<<def[i].var;
 			s<<';';
 		}
@@ -64,18 +62,36 @@ struct parse{
 		return s.str();
 	}
 	string explaiN(){
-		if(lead.size()>0)return lead;
-		ostringstream s;
-		s<<list[0].explaiN()<<'(';
-		if(s.size()>1){
-			for(size_t i=1;i<list.size()-1;++i)s<<list[i].explaiN()<<',';	
-			s<<list[list.size()-1].explaiN();
-		}
-		s<<')';
-		return s.str();
+		if(stat){
+			if(list.size()<1)return "";
+			ostringstream s;
+			if(afterFunc){
+				afterFunc=false;
+				for(size_t i=0;i<list.size();++i)s<<"auto&"<<list[i].explaiN()<<"=mylang"<<i<<';';
+			}else if(list[list.size()-1].explaiN()=="="){
+				if(list.size()<2)throw DefNoName;
+				s<<"auto "<<list[0].explaiN()<<'(';
+				if(list.size()>2){
+					s<<"auto "<<list[1].explaiN();
+					for(size_t i=2;i<list.size()-1;++i)s<<",auto "<<list[i].explaiN();
+					s<<')';
+				}
+			}else{
+				s<<list[0].explaiN()<<'(';
+				if(s.size()>1){
+					for(size_t i=1;i<list.size()-1;++i)s<<list[i].explaiN()<<',';	
+					s<<list[list.size()-1].explaiN();
+				}
+				s<<')';	
+			}
+			return s.str();
+		}else return atom;
 	}
-	vector<parse> list;
-	string lead;
+	char stat;
+	union{
+		vector<parse> list;
+		string atom;
+	};
 }
 int main(int argc,char** argv){
 {	int i;
