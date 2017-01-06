@@ -11,10 +11,10 @@ bool afterFunc=false;
 
 struct parse;
 struct deF{
-	deF(const parse& a,const string& b);
+	deF(const parse& a,const parse& b);
 	~deF();
 	parse *type;
-	string var;
+	parse *var;
 };
 vector<deF> def;
 
@@ -28,7 +28,13 @@ struct parse{
 			l=r;
 			switch(s[r]){
 			case '[':
-				list.emplace_back(s.substr(l+1,SIZE_MAX),&r);
+				parse tmp(s.substr(l+1,SIZE_MAX),&r);
+				if(stat==isType){
+					def.emplace_back(list[list.size()-1],tmp);
+					list[list.size()-1]=tmp;
+					stat=isList;
+				}else
+					list.push_back(tmp);
 				r+=l;
 				break;
 			case ']':
@@ -47,26 +53,23 @@ struct parse{
 					if(s[++r]!='\'')stat=isStr;
 				}
 				r=l;
-				if(stat>1)s[r]='"';
+				if(stat==isStr)s[r]='"';
+				//fall through
 			default:parseDefault:
 				for(;s[r]!=' '&&s[r]!='\t'&&s[r]!=';'&&s[r]!=']'&&r<s.size();++r)if(s[r]=='\\')++r;
-				switch(stat){
-				case isStr:
+				if(stat==isStr){
 					s[r-1]='"';
 					stat=isList;
-					break;
-				case isType:
-					def.emplace_back(list[list.size()-1],s.substr(l,r-l));
-					list.resize(list.size()-1);
-					stat=isList;
-					continue;
-				default:
-					break;
 				}
 				parse tmp;
 				tmp.atom=s.substr(l,r-l);
 				tmp.stat=isAtom;
-				list.push_back(tmp);
+				if(stat==isType){
+					def.emplace_back(list[list.size()-1],tmp);
+					list[list.size()-1]=tmp;
+					stat=isList;
+				}else
+					list.push_back(tmp);
 			}
 		}
 	}
@@ -109,17 +112,20 @@ struct parse{
 			return s.str();
 		}else return atom;
 	}
-	enum{isAtom,isList,isStr,isType} stat;
+	enum{isAtom=0,isList,isStr,isType} stat;
 	vector<parse> list;
 	string atom;
 };
 
-deF::deF(const parse& a,const string& b):var(b){
+deF::deF(const parse& a,const parse& b){
 	type=new parse;
 	*type=a;
+	var=new parse;
+	*var=b;
 }
 deF::~deF(){
 	delete type;
+	delete var;
 }
 
 int main(int argc,char** argv){
