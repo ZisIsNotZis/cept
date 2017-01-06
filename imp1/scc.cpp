@@ -51,6 +51,7 @@ struct parse{
 				if(stat==isStr)s[r]='"';
 				//fall through
 			default:
+				if(s[r]=='e'&&s[r+1]=='n'&&s[r+2]=='u'&&s[r+3]=='m')
 				for(;s[r]!=' '&&s[r]!='\t'&&s[r]!=';'&&s[r]!=']'&&r<s.size();++r)if(s[r]=='\\')++r;
 				tmp.atom=s.substr(l,r-l);			
 				tmp.stat=isAtom;
