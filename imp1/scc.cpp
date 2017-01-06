@@ -1,3 +1,18 @@
+/*	checklist
+	bracket			perfect
+	type=type		defer, crash when two occour at same line, no idea why or how
+	type=range		perfect
+	type=enum		perfect with strict grammar
+	type=func		perfect with strict grammar
+	span			perfect with strict grammar
+	charToStr		perfect
+	backfix			perfect
+
+	Not trying to implement non-strict grammar at all. Usually it's impossible
+	since we don't know data type. Even if some is possible, it's hard to do
+	with this system.
+*/
+
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -6,7 +21,8 @@
 #include <unistd.h>
 using namespace std;
 
-enum{DefNoType,FuncdefNoName,FuncdefNoPair};
+enum{DefNoType,FuncdefNoName,FuncdefNoPair,BackfixNoFront};
+size_t tab;
 
 struct parse;
 struct deF{
@@ -25,11 +41,11 @@ struct parse{
 		while(r<s.size()){
 			for(;s[r]==' '||s[r]=='\t';++r);
 			parse tmp;
-			parseBack:
 			l=r;
 			switch(s[r]){
 			case '[':
 				tmp=parse(s.substr(l+1,SIZE_MAX),&r);
+				tmp.stat=isList;
 				r+=l+2;
 				break;
 			case ']':
@@ -38,8 +54,15 @@ struct parse{
 			case ';':
 				if(list.size()<1)throw DefNoType;
 				stat=isType;
-				++r;
-				goto parseBack;
+				continue;
+			case '/':	//backfix, like pipelining, echo abc/sed A/head B/tee C -> tee(C,head(B,sed(A,echo(abc))))
+				if(list.size()<1)throw BackfixNoFront;
+				tmp.list=list;
+				tmp.stat=isList;
+				while(list.size()>1)list.pop_back();
+				list[0]=tmp;
+				++backfix;
+				continue;
 			case '\'':
 				if(s[++r]=='\'')			
 					stat=isStr;
@@ -51,8 +74,7 @@ struct parse{
 				if(stat==isStr)s[r]='"';
 				//fall through
 			default:
-				if(s[r]=='e'&&s[r+1]=='n'&&s[r+2]=='u'&&s[r+3]=='m')
-				for(;s[r]!=' '&&s[r]!='\t'&&s[r]!=';'&&s[r]!=']'&&r<s.size();++r)if(s[r]=='\\')++r;
+				for(;s[r]!=' '&&s[r]!='\t'&&s[r]!=';'&&s[r]!=']'&&s[r]!='/'&&r<s.size();++r)if(s[r]=='\\')++r;
 				tmp.atom=s.substr(l,r-l);			
 				tmp.stat=isAtom;
 			}
@@ -62,7 +84,7 @@ struct parse{
 			}
 			if(stat==isType){
 				if(tmp.stat==isList){
-					vector<parse> &typeList=list[list.size()-1].list;
+					vector<parse> &typeList=list[list.size()-1-backfix].list;
 					vector<parse> &tmpList=tmp.list;
 					if(typeList.size()!=tmpList.size())throw FuncdefNoPair;
 					for(size_t i=0;i<typeList.size();++i){
@@ -70,27 +92,25 @@ struct parse{
 						typeList[i].stat=isAtom;
 					}
 				}else{
-					def.emplace_back(list[list.size()-1],tmp.explaiN());
-					list[list.size()-1]=tmp;
-					stat=isList;
+					def.emplace_back(list[list.size()-1-backfix],tmp.explaiN());
+					list[list.size()-backfix]=tmp;
 				}
 				stat=isList;
 			}else
-				list.push_back(tmp);
+				list.insert(list.end()-backfix,tmp);
 		}
 	}
 	string explain(){
 		ostringstream s;
+		//DEFER: crashes when def.size()>1, no idea why is that
 		for(size_t i=0;i<def.size();++i){
 			string S=def[i].type->explaiN();
 			size_t j;
 			for(j=1;j<S.size()&&S[j]!='(';++j);
-			if(S[j]=='(')s<<S.substr(0,j)<<' '<<def[i].var<<S.substr(j,SIZE_MAX);
-			else s<<S<<' '<<def[i].var;
+			if(j<S.size()&&S[j]=='(')s<<"decltype("<<S.substr(0,j)<<") "<<def[i].var<<S.substr(j,SIZE_MAX);
+			else s<<"decltype("<<S<<") "<<def[i].var;
 			s<<';';
 		}
-		//def.resize(0)
-		//TODO: why don't this work
 		while(def.size()>0)
 			def.pop_back();
 		s<<explaiN();
@@ -101,23 +121,48 @@ struct parse{
 			if(list.size()<1)return "";
 			if(list.size()<2&&list[0].stat==isList)return list[0].explaiN();
 			ostringstream s;
-			s<<list[0].explaiN()<<'(';
+			char bra='(',ket=')';
+			string head=list[0].explaiN();
+			if(head=="enum"){
+				bra='{';
+				ket='}';
+			}else if(head=="it"){
+				list.erase(list.begin());
+				s<<"for(auto&"<<'h'+tab<<':'<<explaiN()<<')';
+				return s.str();
+			}else if(head=="span"){
+				list.erase(list.begin());
+				char it='h'+tab;
+				s<<"for("<<it<<"=0;"<<it<<"<("<<explaiN()<<");++"<<it<<')';
+				return s.str();
+			}else if(head[0]=='-'||head[0]=='.'||(head[0]>='0'&&head[0]<='9')){
+				for(size_t i=0;i<head.size();++i)
+					if(head[i]=='.'){
+						head="double";
+						break;
+					}else if(head[i]=='\\')
+						++i;
+			}
+			s<<list[0].explaiN()<<bra;
 			if(list.size()>1){
 				s<<list[1].explaiN();
 				for(size_t i=2;i<list.size();++i)s<<','<<list[i].explaiN();	
 			}
-			s<<')';
+			s<<ket;
 			return s.str();
 		}else return atom;
 	}
 	enum{isAtom=0,isList,isStr,isType} stat;
+	size_t backfix=0;
 	vector<parse> list;
 	string atom;
 };
 
 deF::deF(const parse& a,const string& b):var(b){
 	type=new parse;
-	*type=a;
+	type->stat=a.stat;
+	type->list=a.list;
+	type->atom=a.atom;
 }
 deF::~deF(){
 	delete type;
@@ -125,7 +170,9 @@ deF::~deF(){
 
 int main(int argc,char** argv){
 {	int i;
-	size_t j,J=0,line;
+	size_t j,line;
+	size_t &J=tab;
+	J=0;
 	ifstream F;
 	ofstream f;
 	string s;
@@ -166,6 +213,7 @@ int main(int argc,char** argv){
 				case DefNoType:cerr<<argv[0]<<": "<<argv[i]<<' '<<line<<": Expected type before ';'\n";continue;
 				case FuncdefNoName:cerr<<argv[0]<<": "<<argv[i]<<' '<<line<<": Expected function name before '='\n";continue;
 				case FuncdefNoPair:cerr<<argv[0]<<": "<<argv[i]<<' '<<line<<": Expected atom number aside ';' to be the same\n";continue;
+				case BackfixNoFront:cerr<<argv[0]<<": "<<argv[i]<<' '<<line<<": Expected function before '/'\n";continue;
 				}
 			}
 
