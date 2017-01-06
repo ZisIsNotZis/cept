@@ -1,14 +1,24 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <sstream>
+#include <cstring>
+#include <unistd.h>
 using namespace std;
+
+constexpr size_t DefNoType=1;
+constexpr size_t DefNoName=2;
+bool afterFunc=false;
+
+struct parse;
 struct deF{
-	deF(parse t,string v):type(t),var(v){}
-	parse type;
+	deF(const parse& a,const string& b);
+	~deF();
+	parse *type;
 	string var;
 };
 vector<deF> def;
-bool afterFunc=false;
+
 struct parse{
 	parse(){}
 	parse(string s,size_t* retPos=0){
@@ -25,7 +35,7 @@ struct parse{
 				if(list.size()<1)throw DefNoType;
 				staT=2;
 				++r;
-				goto default;
+				goto parseDefault;
 			case '\'':
 				if(s[++r]=='\'')
 					staT=1;
@@ -35,11 +45,14 @@ struct parse{
 				}
 				r=l;
 				if(staT)s[r]='"';
-			default:
+			default:parseDefault:
 				for(;s[r]!=' '&&s[r]!='\t'&&s[r]!=';'&&s[r]!=']'&&r<s.size();++r)if(s[r]=='\\')++r;
 				switch(staT){
 				case 1:s[r-1]='"';break;
-				case 2:def.emplace_back(list[list.size()-1],s.substr(l,r-l));continue;
+				case 2:
+					def.emplace_back(list[list.size()-1],s.substr(l,r-l));
+					list.resize(list.size()-1);
+					continue;
 				}
 				parse tmp;
 				tmp.atom=s.substr(l,r-l);
@@ -51,9 +64,9 @@ struct parse{
 	string explain(){
 		ostringstream s;
 		for(size_t i=0;i<def.size();++i){
-			string S=def[i].type.explaiN();
+			string S=def[i].type->explaiN();
 			size_t j;
-			for(j=1;j<S.size()&&s[j]!='(';++j);
+			for(j=1;j<S.size()&&S[j]!='(';++j);
 			if(S[j]=='(')s<<S.substr(0,j)<<' '<<def[i].var<<S.substr(j,SIZE_MAX);
 			else s<<S<<' '<<def[i].var;
 			s<<';';
@@ -79,7 +92,7 @@ struct parse{
 				afterFunc=true;
 			}else{
 				s<<list[0].explaiN()<<'(';
-				if(s.size()>1){
+				if(list.size()>1){
 					for(size_t i=1;i<list.size()-1;++i)s<<list[i].explaiN()<<',';	
 					s<<list[list.size()-1].explaiN();
 				}
@@ -89,14 +102,21 @@ struct parse{
 		}else return atom;
 	}
 	char stat;
-	union{
-		vector<parse> list;
-		string atom;
-	};
+	vector<parse> list;
+	string atom;
+};
+
+deF::deF(const parse& a,const string& b):var(b){
+	type=new parse;
+	*type=a;
 }
+deF::~deF(){
+	delete type;
+}
+
 int main(int argc,char** argv){
 {	int i;
-	size_t j,line;
+	size_t j,J=0,line;
 	ifstream F;
 	ofstream f;
 	string s;
@@ -127,23 +147,26 @@ int main(int argc,char** argv){
 			if(j>J)
 				for(;j>J;++J)f<<'{';
 			else{
-				f<<';'
-				for(;J>j;--J)f<<'}';
+				f<<';';
+				for(;j<J;--J)f<<'}';
 			}
-			try f<<parse(s).explain();catch(int n)switch n{
-			case EnoTypeBeforeVar:
-				cerr<<argv[0]<<": "<<argv[i]<<' '<<line<<": Expect type before var\n";
-				continue;
+			try{
+				f<<parse(s).explain();
+			}catch(int n){
+				switch(n){
+				case DefNoType:cerr<<argv[0]<<": "<<argv[i]<<' '<<line<<": Expect type before var\n";continue;
+				case DefNoName:cerr<<argv[0]<<": "<<argv[i]<<' '<<line<<": Expect name after type\n";continue;
+				}
 			}
 
 		}
 		for(;J>0;--J)f<<'}';
 	}
-}	argv[0]="g++"
+}	argv[0]=(char*)"g++";
 	execvp(argv[0],argv);
-	argv[0]="clang++"
+	argv[0]=(char*)"clang++";
 	execvp(argv[0],argv);
-	argv[0]="icl"
+	argv[0]=(char*)"icl";
 	execvp(argv[0],argv);
-	cerr<<argv[0]<<": Cannot open either gcc, clang, or icc\n";
+	cerr<<argv[0]<<": Files converted, but cannot open either gcc, clang, or icc\n";
 }		
