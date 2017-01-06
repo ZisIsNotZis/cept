@@ -1,0 +1,8 @@
+[int];[main]
+	span atom 10
+		span atom 5-i/2
+			write ' '
+		span atom i
+			write '*'
+		write '\n'
+	write 'Merry X\'mas'
