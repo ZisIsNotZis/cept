@@ -6,15 +6,14 @@
 #include <unistd.h>
 using namespace std;
 
-enum{DefNoType,FuncNoName};
-bool afterFunc=false;
+enum{DefNoType,FuncdefNoName,FuncdefNoPair};
 
 struct parse;
 struct deF{
-	deF(const parse& a,const parse& b);
+	deF(const parse& a,const string& b);
 	~deF();
 	parse *type;
-	parse *var;
+	string var;
 };
 vector<deF> def;
 
@@ -25,28 +24,24 @@ struct parse{
 		stat=isList;
 		while(r<s.size()){
 			for(;s[r]==' '||s[r]=='\t';++r);
+			parse tmp;
+			parseBack:
 			l=r;
 			switch(s[r]){
 			case '[':
-				parse tmp(s.substr(l+1,SIZE_MAX),&r);
-				if(stat==isType){
-					def.emplace_back(list[list.size()-1],tmp);
-					list[list.size()-1]=tmp;
-					stat=isList;
-				}else
-					list.push_back(tmp);
-				r+=l;
+				tmp=parse(s.substr(l+1,SIZE_MAX),&r);
+				r+=l+2;
 				break;
 			case ']':
-				if(retPos)*retPos=r+1;
+				if(retPos)*retPos=r;
 				return;
 			case ';':
 				if(list.size()<1)throw DefNoType;
 				stat=isType;
 				++r;
-				goto parseDefault;
+				goto parseBack;
 			case '\'':
-				if(s[++r]=='\'')
+				if(s[++r]=='\'')			
 					stat=isStr;
 				else{
 					if(s[r]=='\\')++r;
@@ -55,22 +50,32 @@ struct parse{
 				r=l;
 				if(stat==isStr)s[r]='"';
 				//fall through
-			default:parseDefault:
+			default:
 				for(;s[r]!=' '&&s[r]!='\t'&&s[r]!=';'&&s[r]!=']'&&r<s.size();++r)if(s[r]=='\\')++r;
-				if(stat==isStr){
-					s[r-1]='"';
-					stat=isList;
-				}
-				parse tmp;
-				tmp.atom=s.substr(l,r-l);
+				tmp.atom=s.substr(l,r-l);			
 				tmp.stat=isAtom;
-				if(stat==isType){
-					def.emplace_back(list[list.size()-1],tmp);
+			}
+			if(stat==isStr){
+				tmp.atom[tmp.atom.size()-1]='"';
+				stat=isList;
+			}
+			if(stat==isType){
+				if(tmp.stat==isList){
+					vector<parse> &typeList=list[list.size()-1].list;
+					vector<parse> &tmpList=tmp.list;
+					if(typeList.size()!=tmpList.size())throw FuncdefNoPair;
+					for(size_t i=0;i<typeList.size();++i){
+						typeList[i].atom=typeList[i].explaiN()+' '+tmpList[i].explaiN();
+						typeList[i].stat=isAtom;
+					}
+				}else{
+					def.emplace_back(list[list.size()-1],tmp.explaiN());
 					list[list.size()-1]=tmp;
 					stat=isList;
-				}else
-					list.push_back(tmp);
-			}
+				}
+				stat=isList;
+			}else
+				list.push_back(tmp);
 		}
 	}
 	string explain(){
@@ -83,32 +88,24 @@ struct parse{
 			else s<<S<<' '<<def[i].var;
 			s<<';';
 		}
+		//def.resize(0)
+		//TODO: why don't this work
+		while(def.size()>0)
+			def.pop_back();
 		s<<explaiN();
 		return s.str();
 	}
 	string explaiN(){
 		if(stat){
 			if(list.size()<1)return "";
+			if(list.size()<2&&list[0].stat==isList)return list[0].explaiN();
 			ostringstream s;
-			if(afterFunc){
-				afterFunc=false;
-				if(list.size()>0){
-					s<<"auto "<<list[0].explaiN();
-					for(size_t i=1;i<list.size();++i)s<<",auto "<<list[i].explaiN();
-				}
-				s<<"){";
-			}else if(list[list.size()-1].explaiN()=="="){
-				if(list.size()<2)throw FuncNoName;
-				s<<"auto "<<list[0].explaiN()<<'(';
-				afterFunc=true;
-			}else{
-				s<<list[0].explaiN()<<'(';
-				if(list.size()>1){
-					for(size_t i=1;i<list.size()-1;++i)s<<list[i].explaiN()<<',';	
-					s<<list[list.size()-1].explaiN();
-				}
-				s<<')';	
+			s<<list[0].explaiN()<<'(';
+			if(list.size()>1){
+				s<<list[1].explaiN();
+				for(size_t i=2;i<list.size();++i)s<<','<<list[i].explaiN();	
 			}
+			s<<')';
 			return s.str();
 		}else return atom;
 	}
@@ -117,15 +114,12 @@ struct parse{
 	string atom;
 };
 
-deF::deF(const parse& a,const parse& b){
+deF::deF(const parse& a,const string& b):var(b){
 	type=new parse;
 	*type=a;
-	var=new parse;
-	*var=b;
 }
 deF::~deF(){
 	delete type;
-	delete var;
 }
 
 int main(int argc,char** argv){
@@ -158,7 +152,6 @@ int main(int argc,char** argv){
 		while(getline(F,s)){
 			++line;
 			for(j=0;s[j]=='\t';++j);
-			if(afterFunc)++J;
 			if(j>J)
 				for(;j>J;++J)f<<'{';
 			else{
@@ -169,8 +162,9 @@ int main(int argc,char** argv){
 				f<<parse(s).explain()<<'\n';
 			}catch(int n){
 				switch(n){
-				case DefNoType:cerr<<argv[0]<<": "<<argv[i]<<' '<<line<<": Expect type before var\n";continue;
-				case FuncNoName:cerr<<argv[0]<<": "<<argv[i]<<' '<<line<<": Expect name after type\n";continue;
+				case DefNoType:cerr<<argv[0]<<": "<<argv[i]<<' '<<line<<": Expected type before ';'\n";continue;
+				case FuncdefNoName:cerr<<argv[0]<<": "<<argv[i]<<' '<<line<<": Expected function name before '='\n";continue;
+				case FuncdefNoPair:cerr<<argv[0]<<": "<<argv[i]<<' '<<line<<": Expected atom number aside ';' to be the same\n";continue;
 				}
 			}
 
