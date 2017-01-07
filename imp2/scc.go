@@ -11,7 +11,7 @@ type def struct{
 }
 
 type leaf []byte
-func (a leaf) parse(t []byte) uint64{
+func (a *leaf) parse(t []byte) uint64{
 	I:=0
 	if (t[0]<='9'&&t[0]>='0')||t[0]=='_'{
 		nodot:=true
@@ -42,7 +42,7 @@ type tree struct{
 	a []code
 	d []def
 }
-func (a tree) parse(t []byte) uint64{
+func (a *tree) parse(t []byte) uint64{
 	//TODO
 }
 func (a tree) explain() (r []byte){
