@@ -1,0 +1,5 @@
+************************************
+*             README               *
+************************************
+
+Implementation two uses Go to write the parser (but still convert to C++) for trying purpose. After implemented implementation one, I'll see if this would be more convenient.
